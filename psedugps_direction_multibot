@@ -1,0 +1,248 @@
+import math
+import cv2
+import numpy as np
+import serial
+import time
+#import cv2.cv
+
+#def nothing(x):
+#pass
+d1x = [70,90,60,80]
+d1y = [70,50,90,60]
+anticlockwise= ['a','e','i','m','q']
+clockwise = ['b','f','j','n','r']
+forward = ['c','g','k','o','s']
+stop = ['d','h','l','p','t']
+cent_x =[]
+cent_y =[]
+orient =[]
+y_h =[]	
+x_h =[]
+y_l =[]
+x_l =[]
+ROI = []
+binary = []
+count = 0
+print 'Initialising Code'
+cap = cv2.VideoCapture(1)
+isopen=cap.isOpened()
+#cv2.namedWindow('thresh')	
+cv2.namedWindow('thresh')	
+ser = serial.Serial('/dev/ttyUSB0',9600,timeout=None)
+print ser.name
+string = ''
+botcommand = ''
+if(isopen == False):
+	cap.open()
+Bots = input('Enter number of BOTS:')
+#print 'Focusing'
+# cv2.namedWindow('testframeori')
+while(count < 250):
+	testret, testframeori = cap.read()
+	count +=1
+	print 'Focusing upto 250', count
+	
+	#if testframeori != None:
+		#cv2.imshow('testframeori',testframeori)
+	
+	
+print 'Starting module'
+while(True):
+	
+	#y_h = y_l = x_h = x_l = 0
+	ret, frameori = cap.read()
+	frame = frameori[20:400, 63:578]
+	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+		
+		
+	blurimg = cv2.blur(gray,(5,5))	
+	ret,thresh = cv2.threshold(blurimg,70,255,cv2.THRESH_BINARY_INV)
+	
+	cv2.imshow('thresh',thresh)
+	_,contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+	cv2.drawContours(frame, contours, -1, (0,255,0), 1)
+	recti =[]
+	areai = []
+	#print 'contour #',len(contours)
+	for i in range(0,len(contours)):
+		cnt = contours[i]
+		recti.append(cv2.minAreaRect(cnt))
+		areai.append(cv2.contourArea(cnt))
+		#print 'area'+str(i)+'= ',cv2.contourArea(cnt)
+		
+#	print 'area', areai	
+	indicesi = [area1[0] for area1 in sorted(enumerate(areai), key=lambda x:x[1], reverse=True)]
+#	print 'max-min index', indicesi
+	recti_n = []
+	botnumber_n= []
+	for i in range(0,Bots):
+		ind = indicesi[i]
+		rect1 = recti[ind]
+#		print 'rect'+str(i), rect1
+		dist = []
+		botnumber_new = -2
+		for j in range(0,len(recti)):
+			rectc=recti[j]
+			dist1 = math.hypot((rect1[0][0]-rectc[0][0]),(rect1[0][1]-rectc[0][1]))
+			dist.append(dist1)
+			if(dist1 < 30):
+				botnumber_new = botnumber_new + 1
+		print 'dist', dist
+		ROI.append(blurimg[rect1[0][1]-30:rect1[0][1]+30,rect1[0][0]-30:rect1[0][0]+30])
+		botnumber_n.append(botnumber_new)
+		recti_n.append(rect1)
+		backupi = blurimg[rect1[0][1]-30:rect1[0][1]+30,rect1[0][0]-30:rect1[0][0]+30]
+		
+		#print ROI[i]
+		#cv2.namedWindow('ROI'+str(i))
+		#cv2.imshow('ROI',ROI[i])
+	
+	for i in range(0,len(ROI)):
+#		print 'i: ', i
+#		print len(ROI)
+		recti_update = recti_n[i]
+		botnumber_update = botnumber_n[i]
+		#botnumber = -2
+		#print 'ROI',ROI[i]
+		#cv2.namedWindow('ROI'+str(i))
+		#cv2.imshow('ROI'+str(i),ROI[i])
+		#print 'flag1'
+		reti,binary1 = cv2.threshold(ROI[i],100,255,cv2.THRESH_BINARY_INV)
+		binary.append(binary1)
+		#print 'flag2'
+		#print binary1
+		#print 'backup', backup
+		if(binary1 == None):
+			print 'entered if'
+#			print backup
+			binary1 = backup
+		
+		_,contours1, hierarchy = cv2.findContours(binary1,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+		backup = binary1
+		areas = []
+		rects = []
+		for j in range(0,len(contours1)):
+			cnt = contours1[j]
+			# print 'cnt: ', cnt
+			#rect = cv2.minAreaRect(cnt)
+			rects.append(cv2.minAreaRect(cnt))
+			#print 'area'+str(j)+'= ',cv2.contourArea(cnt)
+			areas.append(cv2.contourArea(cnt))
+			# if(cv2.contourArea(cnt)>0):
+				# botnumber = botnumber + 1
+			
+			#if(cv2.contourArea(cnt)<110 and cv2.contourArea(cnt)>45):
+			#print 'small', rect[1]py
+				#print 'rect: ', rect
+				#y_l.append(rect[0][1])
+				#x_l.append(rect[0][0])
+			#if(cv2.contourArea(cnt)>=110 and cv2.contourArea(cnt)>45):
+			#print 'large', rect[1]
+				#y_h.append(rect[0][1])
+				#x_h.append(rect[0][0])
+		#if (x_l[i] ==[] or x_h[i] ==[] or y_h[i] ==[] or y_l[i] == []):
+			#x_l[i] = 0
+			#x_h[i] = 0
+			#y_h[i] = 0
+			#y_l[i] = 0
+		#else:	
+		# print 'int', int((x_l[i]+x_h[i])), int((y_l[i]+y_h[i]))
+		indices = [area[0] for area in sorted(enumerate(areas), key=lambda x:x[1], reverse=True)]
+		# areas = sorted(areas, reverse=True)
+		#print 'areas: ', indices
+		if len(indices) >= 2:
+			indexMax = indices[0]
+			indexMax2 = indices[1]
+		else:
+			print 'Error Ignored'
+			indexMax = indices[0]
+			indexMax2 = indices[0]
+		#for a in range(0,len(areai):
+			#if(areas[indexMax]<
+#		print 'areas' , areas
+#		print 'areai', areai
+		
+		#print 'areas max two: ', areas[indexMax], areas[indexMax2]
+		#print 'rects max two: ', rects[indexMax], rects[indexMax2]
+		rect1 = rects[indexMax]
+		rect2 = rects[indexMax2]
+		cv2.drawContours(frame, contours1, indexMax, (0,255,0), 1)
+		cv2.drawContours(frame, contours1, indexMax2, (0,255,0), 1)
+#		print 'rect1',rect1
+#		print 'rect2',rect2
+		
+					
+		y_l.append(rect2[0][1])
+		x_l.append(rect2[0][0])	
+		y_h.append(rect1[0][1])
+		x_h.append(rect1[0][0])
+		x_c = recti_update[0][0]
+		y_c = recti_update[0][1]	
+		cent_x.append(int(x_c)/5)
+		cent_y.append(int(y_c)/5)
+		botnumber = botnumber_update		
+		print botnumber
+		orient.append((-1)*math.degrees(math.atan2(y_h[i]-y_l[i],x_h[i]-x_l[i])))
+		if(orient[i] < 0):
+			orient[i] = orient[i] + 360
+		elif(orient[i] == -0):
+			orient[i] = 0		
+		#print '('+str(botnumber)+','+str(cent_x[i])+','+str(cent_y[i])+','+str(int(orient[i]))+')'
+		#ser.write('('+str(botnumber)+','+str(cent_x[i])+','+str(cent_y[i])+','+str(int(orient[i]))+')')
+		print 'x=',cent_x[i],'y=',cent_y[i], 'dx=',d1x[botnumber],'dy=',d1y[botnumber] 
+		string = string + '('+str(botnumber)+','+str(cent_x[i])+','+str(cent_y[i])+','+str(int(orient[i]))+')'
+		angle = (-1)*math.degrees(math.atan2((d1y[botnumber]-cent_y[i]),(d1x[botnumber]-cent_x[i])))
+		
+		if(angle<0):
+#			print 'loop'
+			angle = angle + 360
+		
+		print angle
+		print orient[i]
+		
+		if((abs(cent_x[i]-d1x[botnumber])<2) and (abs(cent_y[i] == d1y[botnumber])<2)):
+			botcommand = botcommand + stop[botnumber]
+		elif(orient[i]<angle-10 or orient[i]>angle+10):
+			if(orient[i]>angle):
+				if(orient[i]-angle <= 180):
+					botcommand =botcommand + clockwise[botnumber]
+				else:
+					botcommand =botcommand + anticlockwise[botnumber]
+			else :
+				if(angle-orient[i] <= 180):
+					botcommand =botcommand + anticlockwise[botnumber]
+				else:
+					botcommand =botcommand + clockwise[botnumber]
+			
+		
+		else:
+			botcommand = botcommand + forward[botnumber]
+		
+		#ser.write('('+str(1)+','+str(cent_x[0])+','+str(cent_y[0])+','+str(int(orient[0]))+')')
+		#print ('('+str(1)+','+str(cent_x[0])+','+str(cent_y[0])+','+str(int(orient[0]))+')')
+	print 'POSE_BOT'
+	print string
+	print 'COMMAND', botcommand
+	ser.write(botcommand)
+	string = ''
+	botcommand = ''
+	binary =[]	
+	cent_x =[]
+	cent_y =[]
+	orient =[]
+	y_h =[]	
+	ROI =[]
+	x_h =[]
+	y_l =[]
+	x_l =[]
+	#for l in range(0,len(frame[0])):
+		#cv2.line(frame,(i,0),(i,len(frame[0])),(255,0,0),5)
+		#l+=20
+	cv2.imshow('frame',frame)
+	if cv2.waitKey(10) == ord('s'):
+		break
+	
+
+
+cap.release()
+cv2.destroyAllWindows()
